@@ -10,7 +10,7 @@ from jwt.exceptions import ExpiredSignatureError, InvalidSignatureError, Invalid
 app = FastAPI()
 
 # --- Configurations ---
-ALLOWED_ORIGIN = "https://example.com"
+ALLOWED_ORIGIN = "https://dash-tnttp2.example.com"
 ISSUER = "https://idp.exam.local"
 AUDIENCE = "tds-odk62thg.apps.exam.local"
 
