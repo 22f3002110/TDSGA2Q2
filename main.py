@@ -9,6 +9,7 @@ from jwt.exceptions import ExpiredSignatureError, InvalidSignatureError, Invalid
 import os
 from typing import List
 import yaml
+from fastapi import Header
 
 
 app = FastAPI()
@@ -233,3 +234,79 @@ async def get_effective_config(response: Response, set_params: Optional[List[str
     config["api_key"] = "****"
 
     return config
+
+#=====Q7
+# --- Models for Analytics ---
+class EventItem(BaseModel):
+    user: str
+    amount: float
+    ts: int
+
+class AnalyticsRequest(BaseModel):
+    events: List[EventItem]
+
+class AnalyticsResponse(BaseModel):
+    email: str
+    total_events: int
+    unique_users: int
+    revenue: float
+    top_user: str
+
+# Your assigned API Key from Layer 4
+ASSIGNED_API_KEY = "ak_xz9vzb3uxqze1yikf6veaz77"
+
+@app.post("/analytics", response_model=AnalyticsResponse)
+async def post_analytics(
+    payload: AnalyticsRequest, 
+    response: Response,
+    x_api_key: str = Header(None, alias="X-API-Key")
+):
+    # Enforce global wildcard accessibility for this cross-origin browser validation check
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+
+    # 1. Enforce Authentication Check
+    if not x_api_key or x_api_key != ASSIGNED_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing X-API-Key header"
+        )
+
+    events = payload.events
+    total_events = len(events)
+    
+    # 2. Aggregation processing loops
+    unique_users_set = set()
+    user_revenue_map = {}
+    total_revenue = 0.0
+
+    for item in events:
+        user_name = item.user
+        unique_users_set.add(user_name)
+        
+        # Only aggregate entries where amount > 0
+        if item.amount > 0:
+            total_revenue += item.amount
+            user_revenue_map[user_name] = user_revenue_map.get(user_name, 0.0) + item.amount
+
+    # Find top user with the highest positive-amount total
+    top_user = ""
+    if user_revenue_map:
+        top_user = max(user_revenue_map, key=user_revenue_map.get)
+
+    return {
+        "email": "your-email@example.com",  # Replace with your actual logged-in grader email
+        "total_events": total_events,
+        "unique_users": len(unique_users_set),
+        "revenue": round(total_revenue, 4),
+        "top_user": top_user
+    }
+
+# Handle CORS Preflight OPTIONS requests for the /analytics endpoint explicitly
+@app.options("/analytics")
+async def options_analytics(response: Response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key"
+    return {"status": "ok"}
