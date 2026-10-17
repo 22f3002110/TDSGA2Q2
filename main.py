@@ -142,7 +142,12 @@ def coerce_config(cfg: dict) -> dict:
     return coerced
 
 @app.get("/effective-config")
-async def get_effective_config(set_params: List[str] = Query(None, alias="set")):
+async def get_effective_config(response: Response, set_params: List[str] = Query(None, alias="set")):
+    # 1. Enforce global wildcard accessibility just for this specific endpoint response
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+
     # Layer 1: Start with defaults
     effective = DEFAULTS.copy()
 
