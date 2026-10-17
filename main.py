@@ -237,6 +237,10 @@ async def get_effective_config(response: Response, set_params: Optional[List[str
 
 #=====Q7
 # --- Models for Analytics ---
+from typing import List, Optional, Any
+from pydantic import BaseModel
+from fastapi import Header, HTTPException, status, Response
+
 class EventItem(BaseModel):
     user: str
     amount: float
@@ -252,22 +256,21 @@ class AnalyticsResponse(BaseModel):
     revenue: float
     top_user: str
 
-# Your assigned API Key from Layer 4
 ASSIGNED_API_KEY = "ak_xz9vzb3uxqze1yikf6veaz77"
 
 @app.post("/analytics", response_model=AnalyticsResponse)
 async def post_analytics(
     payload: AnalyticsRequest, 
     response: Response,
-    x_api_key: str = Header(None, alias="X-API-Key")
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
-    # Enforce global wildcard accessibility for this cross-origin browser validation check
+    # Secondary redundancy layer: Force explicit browser headers on the active response stream
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key"
 
     # 1. Enforce Authentication Check
-    if not x_api_key or x_api_key != ASSIGNED_API_KEY:
+    if not x_api_key or x_api_key.strip() != ASSIGNED_API_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing X-API-Key header"
@@ -285,28 +288,20 @@ async def post_analytics(
         user_name = item.user
         unique_users_set.add(user_name)
         
-        # Only aggregate entries where amount > 0
+        # Aggregate logic rule: Only parse items where amount > 0
         if item.amount > 0:
             total_revenue += item.amount
             user_revenue_map[user_name] = user_revenue_map.get(user_name, 0.0) + item.amount
 
-    # Find top user with the highest positive-amount total
+    # Find top user with the highest positive-amount total (guaranteed no ties)
     top_user = ""
     if user_revenue_map:
         top_user = max(user_revenue_map, key=user_revenue_map.get)
 
     return {
-        "email": "your-email@example.com",  # Replace with your actual logged-in grader email
+        "email": "your-email@example.com",  # Adjust to your platform registered email address
         "total_events": total_events,
         "unique_users": len(unique_users_set),
         "revenue": round(total_revenue, 4),
         "top_user": top_user
     }
-
-# Handle CORS Preflight OPTIONS requests for the /analytics endpoint explicitly
-@app.options("/analytics")
-async def options_analytics(response: Response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key"
-    return {"status": "ok"}
